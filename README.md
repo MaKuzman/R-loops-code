@@ -1,2 +1,2 @@
 # R-loops-code
-Comde accompanying R loop paper
+Code accompanying R loop paper
