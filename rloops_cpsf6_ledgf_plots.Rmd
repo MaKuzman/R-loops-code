@@ -1,0 +1,231 @@
+---
+title: "R Notebook"
+output: html_document
+author: Maja Kuzman
+---
+
+```{r}
+Sys.setlocale(category = "LC_ALL", locale = "Croatian")
+
+library(data.table)
+library(ggplot2)
+x <- readRDS("FiguresPaper/genidf_numberofexons_rigs_rloops_cpsf6_ledgf_rloopsHEK_ENGELMANRIGSRAGS.RDS")
+x[,':='(rloopscpsf6=paste(rloop,cpsf6, sep=", "),
+        rloopsLEDGF=paste(rloop,LEDGF, sep=", "))]
+x
+```
+
+```{r}
+y <- unique(x[RIG!="1",.(N=.N),.(rloopscpsf6,RIG)])
+ggplot(y,aes(RIG, fill=rloopscpsf6,y=N))+theme_light()+
+  geom_bar(stat="identity", position="fill")+
+  geom_text(aes(label=N), position=position_fill(vjust = 0.8), color="white", size=5)+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+    theme(legend.title = element_blank())+
+    scale_fill_manual(values=c("#bababa", "#404040","#ca0020", "#f4a582" ))
+  
+yl <- unique(x[RIG!="1",.(N=.N),.(rloopsLEDGF,RIG)])
+ggplot(yl,aes(RIG, fill=rloopsLEDGF,y=N))+theme_light()+
+  geom_bar(stat="identity", position="fill")+
+  geom_text(aes(label=N), position=position_fill(vjust = 0.8), color="white", size=5)+
+  scale_y_continuous(labels = scales::percent)+
+  ylab("")+
+  theme(legend.title = element_blank())+
+  scale_fill_manual(values=c("#bababa", "#404040","#ca0020", "#f4a582" ))
+
+
+
+```
+
+```{r}
+library(gt)
+library(binom)
+
+yl <- unique(x[RIG!="1",.(N=.N,rloop,LEDGF),.(rloopsLEDGF,RIG)])
+yl <- yl[,total:=sum(N),.(RIG, rloop)][LEDGF!="no LEDGF"]
+fplot <- yl[,.(RIG,rloop,`overlaps LEDGF`=N,total)][order(RIG,rloop)]
+CIs5 <- data.table(binom.confint(x=fplot$`overlaps LEDGF`, n=(fplot$total), methods="wilson"))
+fplot <- cbind(fplot,CIs5[,.(mean, lower,upper)])
+
+gt(fplot, groupname_col = "RIG", rowname_col = "rloop")
+plotledgf <- ggplot(fplot, aes(`RIG`,mean,fill=`rloop`))+
+  geom_bar(position="dodge", stat="identity")+
+  theme_light()+
+#  facet_grid(``~.)+ 
+  geom_errorbar(aes(ymin=lower, ymax=upper) , width=.1, position=position_dodge(0.9), color="darkslategray" )+
+  theme(legend.position = "bottom", legend.title = element_blank())+
+  geom_text(aes(label=paste(`overlaps LEDGF`,total,sep="/"), y=upper+0.05), position=position_dodge(width=0.9))+
+  ylab("Fraction overlapping LEDGF")+xlab("")+
+  geom_text(aes(label=paste(round(mean*100,1),"%",sep=""), y=0.05), position=position_dodge(width=0.9))+
+  coord_cartesian(ylim=c(0,1))+
+  scale_fill_manual(values=c( "#f4a582","#ca0020"))
+plotledgf
+```
+
+
+```{r}
+library(ggsignif)
+# annot_12 = (prop.test(1343,10736,803/4802)$p.value)
+# annot_24 = prop.test(803,4802,629/1189,)$p.value
+# annot_13 = prop.test(1343,10736,183/344)$p.value
+# annot_34 = prop.test(183,344,629/1189)$p.value
+
+annot_12=paste("p < 0.001 ***")
+annot_24=paste("p < 0.001 ***")
+annot_13=paste("p < 0.001 ***")
+annot_34=paste("p =",0.95)
+
+plotledgf + 
+  geom_signif(annotations = 
+                c(formatC(annot_12, digits=3),
+                  formatC(annot_34, digits=3),
+                  formatC(annot_13, digits=3),
+                  formatC(annot_24, digits=3)), 
+            y_position = c(0.75, 0.75, 0.85, 0.95), 
+            xmin=c(0.75, 1.75, 0.75,1.25), xmax=c(1.25, 2.25, 1.75, 2.25))
+
+```
+
+
+```{r}
+
+yc <- unique(x[RIG!="1",.(N=.N,rloop,cpsf6),.(rloopscpsf6,RIG)])
+yc <- yc[,total:=sum(N),.(RIG, rloop)][cpsf6!="no cpsf6"]
+fplotc <- yc[,.(RIG,rloop,`overlaps cpsf6`=N,total)][order(RIG,rloop)]
+CIs <- data.table(binom.confint(x=fplotc$`overlaps cpsf6`, n=(fplot$total), methods="wilson"))
+fplotc <- cbind(fplotc,CIs[,.(mean, lower,upper)])
+
+gt(fplotc, groupname_col = "RIG", rowname_col = "rloop")
+plotcpsf6 <- ggplot(fplotc, aes(`RIG`,mean,fill=`rloop`))+
+  geom_bar(position="dodge", stat="identity")+
+  theme_light()+
+#  facet_grid(``~.)+ 
+  geom_errorbar(aes(ymin=lower, ymax=upper) , width=.1, position=position_dodge(0.9), color="darkslategray" )+
+  theme(legend.position = "bottom", legend.title = element_blank())+
+  geom_text(aes(label=paste(`overlaps cpsf6`,total,sep="/"), y=upper+0.05), position=position_dodge(width=0.9))+
+  ylab("Fraction overlapping cpsf6")+xlab("")+
+  geom_text(aes(label=paste(round(mean*100,1),"%",sep=""), y=0.05), position=position_dodge(width=0.9))+
+  coord_cartesian(ylim=c(0,1.25))+
+  scale_fill_manual(values=c( "#f4a582","#ca0020"))
+plotcpsf6
+```
+```{r}
+
+# annot_12 = (prop.test(4785,10736,3137/4802)$p.value)
+# annot_24 = prop.test(3137,4802,1020/1189,)$p.value
+# annot_13 = prop.test(4785,10736,260/344)$p.value
+# annot_34 = prop.test(260,344,1020/1189)$p.value
+
+annot_12=paste("p < 0.001 ***")
+annot_24=paste("p < 0.001 ***")
+annot_13=paste("p < 0.001 ***")
+annot_34=paste("p < 0.001 ***")
+
+plotcpsf6 + 
+  geom_signif(annotations = 
+                c(formatC(annot_12, digits=3),
+                  formatC(annot_34, digits=3),
+                  formatC(annot_13, digits=3),
+                  formatC(annot_24, digits=3)), 
+            y_position = c(1,1,1.1,1.2), 
+            xmin=c(0.75, 1.75, 0.75,1.25), xmax=c(1.25, 2.25, 1.75, 2.25))
+```
+
+
+
+
+```{r}
+x[,.N,hek293RloopOvls>5]
+
+```
+
+```{r, fig.height=7, fig.width=7}
+yl <-(x[RIG!="1",.N,.(RIG,rloop,LEDGF)])
+yl[,total:=sum(N),.(RIG)]
+fplot <- yl[,.(RIG,rloop,LEDGF,N,total)][order(RIG,rloop,LEDGF)]
+CIsl <- data.table(binom.confint(x=fplot$`N`, n=(fplot$total), methods="wilson"))
+fplot <- cbind(fplot,CIsl[,.(mean, lower,upper)])
+
+
+plotledgf <- ggplot(fplot, aes(`RIG`,mean,fill=RIG))+
+  geom_bar(position="dodge", stat="identity")+
+  theme_light()+
+  facet_grid(LEDGF~rloop)+ 
+  geom_errorbar(aes(ymin=lower, ymax=upper) , width=.1, position=position_dodge(0.9), color="darkslategray" )+
+  theme(legend.position = "right", legend.title = element_blank())+
+  geom_text(aes(label=paste(`N`,total,sep="/"), y=upper+0.15), position=position_dodge(width=0.9))+
+  ylab("Fraction of total number of genes in category")+xlab("")+
+  geom_text(aes(label=paste(round(mean*100,1),"%",sep=""), y=0.05), position=position_dodge(width=0.9))+
+  coord_cartesian(ylim=c(0,1))+
+  scale_fill_manual(values=c( "#f4a582","#ca0020"))
+plotledgf
+
+annot_1 = (prop.test(1343,15538,183/1533)$p.value)
+annot_2 = prop.test(803,15538,692/1533,)$p.value
+annot_3 = prop.test(9393,15538,161/1533)$p.value
+annot_4 = prop.test(3999,15538,497/1533)$p.value
+
+annot_1=paste("p < 0.001 ***")
+annot_2=paste("p < 0.001 ***")
+annot_3=paste("p < 0.001 ***")
+annot_4=paste("p < 0.001 ***")
+library(ggsignif)
+plotledgf + 
+  geom_signif(annotations = 
+                c(formatC(annot_1, digits=3)), 
+            y_position = c(0.95), 
+            xmin=c(1), xmax=c(2))
+
+```
+
+
+
+```{r, fig.height=7, fig.width=7}
+yc <-(x[RIG!="1",.N,.(RIG,rloop,cpsf6)])
+yc[,total:=sum(N),.(RIG)]
+fplotc <- yc[,.(RIG,rloop,cpsf6,N,total)][order(RIG,rloop,cpsf6)]
+CIsc <- data.table(binom.confint(x=fplotc$`N`, n=(fplotc$total), methods="wilson"))
+fplotc <- cbind(fplotc,CIsc[,.(mean, lower,upper)])
+
+
+plotcpsf6 <- ggplot(fplotc, aes(`RIG`,mean,fill=RIG))+
+  geom_bar(position="dodge", stat="identity")+
+  theme_light()+
+  facet_grid(cpsf6~rloop)+ 
+  geom_errorbar(aes(ymin=lower, ymax=upper) , width=.1, position=position_dodge(0.9), color="darkslategray" )+
+  theme(legend.position = "right", legend.title = element_blank())+
+  geom_text(aes(label=paste(`N`,total,sep="/"), y=upper+0.15), position=position_dodge(width=0.9))+
+  ylab("Fraction of total number of genes in category")+xlab("")+
+  geom_text(aes(label=paste(round(mean*100,1),"%",sep=""), y=0.05), position=position_dodge(width=0.9))+
+  coord_cartesian(ylim=c(0,1))+
+  scale_fill_manual(values=c( "#f4a582","#ca0020"))
+plotcpsf6
+
+annot_1 = (prop.test(4785,15538,260/1533)$p.value)
+annot_2 = prop.test(3137,15538,1020/1533,)$p.value
+annot_3 = prop.test(5951,15538,84/1533)$p.value
+annot_4 = prop.test(1665,15538,169/1533)$p.value
+
+
+annot_1=paste("p < 0.001 ***")
+annot_2=paste("p < 0.001 ***")
+annot_3=paste("p < 0.001 ***")
+annot_4=paste("p = 0.22 ")
+plotcpsf6 <- plotcpsf6 + 
+  geom_signif(annotations = 
+                c(""), 
+            y_position = c(0.9), 
+            xmin=c(1), xmax=c(2))
+ann_text <- unique(fplotc[,.(rloop,cpsf6)])
+ann_text[,lab:=c("p < 0.001 ***","p < 0.001 ***","p < 0.001 ***","p = 0.22")]
+ann_text[,RIG:="RIG"]
+ann_text[,mean:=0.97]
+
+plotcpsf6 + geom_text(data = ann_text, label=ann_text$lab)
+
+```
+
+
+
+
